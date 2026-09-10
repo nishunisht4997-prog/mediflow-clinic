@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -20,9 +20,13 @@ import {
   HeartPulse,
   Wallet,
   X,
+  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { UserRole } from '@/types';
+import { RoleAuthModal } from '@/components/auth/RoleAuthModal';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 export type NavTab =
   | 'dashboard'
@@ -60,7 +64,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
     dueFollowUps: 7,
   },
 }) => {
+  const router = useRouter();
   const pathname = usePathname();
+  const [authTargetProfile, setAuthTargetProfile] = useState<any | null>(null);
+
+  const roleProfilesMap: Record<
+    string,
+    {
+      role: UserRole;
+      name: string;
+      designation: string;
+      badgeColor: string;
+      route: string;
+    }
+  > = {
+    '/': {
+      role: 'DOCTOR',
+      name: CLINIC_CONFIG.doctorName,
+      designation: CLINIC_CONFIG.specialization,
+      badgeColor: 'bg-sky-500',
+      route: '/',
+    },
+    '/reception': {
+      role: 'RECEPTIONIST',
+      name: 'Priya Sharma',
+      designation: 'Front Desk & Patient Coordinator',
+      badgeColor: 'bg-amber-500',
+      route: '/reception',
+    },
+    '/nurse': {
+      role: 'NURSE',
+      name: 'Snigdha Ray',
+      designation: 'Staff Nurse & Triage In-Charge',
+      badgeColor: 'bg-pink-500',
+      route: '/nurse',
+    },
+    '/accounts': {
+      role: 'ACCOUNTANT',
+      name: 'Rajesh Behera',
+      designation: 'Accounts & Billing Manager',
+      badgeColor: 'bg-emerald-500',
+      route: '/accounts',
+    },
+  };
+
+  const handleRoleWorkspaceClick = (wsHref: string) => {
+    if (pathname === wsHref) {
+      if (onCloseMobile) onCloseMobile();
+      return;
+    }
+    const target = roleProfilesMap[wsHref];
+    if (target) {
+      setAuthTargetProfile(target);
+    } else {
+      router.push(wsHref);
+      if (onCloseMobile) onCloseMobile();
+    }
+  };
+
+  const handleAuthSuccess = (target: any) => {
+    setAuthTargetProfile(null);
+    if (onCloseMobile) onCloseMobile();
+    router.push(target.route);
+  };
 
   const roleWorkspaces = [
     { name: 'Doctor Cabin', href: '/', icon: Stethoscope, color: 'text-sky-600', badge: 'OPD' },
@@ -151,11 +217,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const Icon = ws.icon;
 
               return (
-                <Link
+                <button
+                  type="button"
                   key={ws.href}
-                  href={ws.href}
-                  onClick={() => onCloseMobile && onCloseMobile()}
-                  className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold transition ${
+                  onClick={() => handleRoleWorkspaceClick(ws.href)}
+                  className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold transition text-left cursor-pointer ${
                     isMatch
                       ? 'bg-sky-50 text-sky-900 font-black border border-sky-200/60 shadow-2xs'
                       : 'text-slate-700 hover:bg-slate-50'
@@ -165,10 +231,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <Icon className={`h-4 w-4 ${ws.color}`} />
                     <span>{ws.name}</span>
                   </div>
-                  <span className="text-[9px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
-                    {ws.badge}
-                  </span>
-                </Link>
+                  <div className="flex items-center gap-1">
+                    {!isMatch && <Lock className="h-2.5 w-2.5 text-slate-300" />}
+                    <span
+                      className={`text-[9px] font-semibold px-1.5 py-0.2 rounded ${
+                        isMatch
+                          ? 'bg-sky-200/70 text-sky-800'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {ws.badge}
+                    </span>
+                  </div>
+                </button>
               );
             })}
           </div>
@@ -282,6 +357,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {sidebarContent}
           </div>
         </div>
+      )}
+
+      {/* Staff Security & Role Verification Modal */}
+      {authTargetProfile && (
+        <RoleAuthModal
+          targetProfile={authTargetProfile}
+          onClose={() => setAuthTargetProfile(null)}
+          onSuccess={handleAuthSuccess}
+        />
       )}
     </>
   );
