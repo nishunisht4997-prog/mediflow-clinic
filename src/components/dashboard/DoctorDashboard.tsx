@@ -25,6 +25,7 @@ import {
 import { UserRole } from '@/types';
 import { AnalyticsCharts } from '@/components/dashboard/AnalyticsCharts';
 import { VoiceTokenCaller } from '@/components/dashboard/VoiceTokenCaller';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 interface DoctorDashboardProps {
   data: any;
@@ -78,7 +79,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
               <span>OPD Active &bull; Branch: {selectedBranch}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              GOOD MORNING, {data?.clinic?.doctorName ? data.clinic.doctorName.toUpperCase() : 'DR. AVISHEK'}
+              GOOD MORNING, {data?.clinic?.doctorName ? data.clinic.doctorName.toUpperCase() : CLINIC_CONFIG.doctorShortName.toUpperCase()}
             </h1>
             <p className="text-sm text-slate-300 mt-1 max-w-xl">
               You have <span className="font-bold text-sky-400">{kpi.waiting} patients waiting</span> in the lobby.

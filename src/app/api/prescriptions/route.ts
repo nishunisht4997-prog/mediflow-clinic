@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 export async function GET(request: Request) {
   try {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
         patientId: body.patientId,
         doctorId: doctor.id,
         symptoms: body.symptoms || null,
-        diagnosis: body.diagnosis,
+        diagnosis: body.diagnosis || 'General Clinical Consultation',
         advice: body.advice || null,
         investigationsAdvised: body.investigationsAdvised || null,
         nextFollowUpDate,
@@ -62,23 +63,27 @@ export async function POST(request: Request) {
       }
     });
 
-    // Create prescription items
-    if (body.medicines && Array.isArray(body.medicines)) {
-      for (const m of body.medicines) {
-        if (m.medicineName?.trim()) {
-          await prisma.prescriptionItem.create({
-            data: {
-              prescriptionId: prescription.id,
-              medicineName: m.medicineName,
-              dosage: m.dosage || '500 mg',
-              form: m.form || 'Tablet',
-              frequency: m.frequency || '1-0-1',
-              timing: m.timing || 'After Food',
-              durationDays: parseInt(m.durationDays, 10) || 5,
-              instructions: m.instructions || null,
-            },
-          });
-        }
+    // Create prescription items (support both body.medicines and body.items)
+    const medicineList = (body.medicines && Array.isArray(body.medicines))
+      ? body.medicines
+      : (body.items && Array.isArray(body.items))
+      ? body.items
+      : [];
+
+    for (const m of medicineList) {
+      if (m.medicineName?.trim()) {
+        await prisma.prescriptionItem.create({
+          data: {
+            prescriptionId: prescription.id,
+            medicineName: m.medicineName,
+            dosage: m.dosage || '500 mg',
+            form: m.form || 'Tablet',
+            frequency: m.frequency || '1-0-1',
+            timing: m.timing || 'After Food',
+            durationDays: parseInt(m.durationDays, 10) || 5,
+            instructions: m.instructions || null,
+          },
+        });
       }
     }
 
@@ -92,21 +97,26 @@ export async function POST(request: Request) {
           prescriptionId: prescription.id,
           dueDate: nextFollowUpDate,
           stage: 'SCHEDULED',
-          notes: `Follow-up for ${body.diagnosis}`,
+          notes: `Follow-up for ${body.diagnosis || 'Consultation'}`,
         },
       });
     }
 
     // If appointment ID was provided, mark appointment as COMPLETED
     if (body.appointmentId) {
-      await prisma.appointment.update({
-        where: { id: body.appointmentId },
-        data: { status: 'COMPLETED' },
-      });
+      try {
+        await prisma.appointment.update({
+          where: { id: body.appointmentId },
+          data: { status: 'COMPLETED' },
+        });
+      } catch (e) {
+        console.warn('Could not update appointment status:', e);
+      }
     }
 
-    // If WhatsApp requested, log the message
-    if (body.sendWhatsApp && prescription.patient.phone) {
+    // If WhatsApp requested, log the message safely
+    if (body.sendWhatsApp && prescription.patient?.phone) {
+      const docName = prescription.doctor?.user?.name || CLINIC_CONFIG.doctorName;
       await prisma.notificationLog.create({
         data: {
           clinicId: clinic.id,
@@ -114,24 +124,25 @@ export async function POST(request: Request) {
           recipientPhone: prescription.patient.phone,
           channel: 'WHATSAPP',
           type: 'PRESCRIPTION',
-          content: `Dear ${prescription.patient.name}, Dr. ${prescription.doctor.user.name} has issued your digital prescription for "${body.diagnosis}". Download Rx PDF: https://mediflow.in/rx/${prescription.id}`,
+          content: `Dear ${prescription.patient.name}, Dr. ${docName} has issued your digital prescription for "${prescription.diagnosis}". Download Rx PDF: https://mediflow.in/rx/${prescription.id}`,
           status: 'DELIVERED',
         },
       });
     }
 
-    const completeRx = await prisma.prescription.findUnique({
+    const completePrescription = await prisma.prescription.findUnique({
       where: { id: prescription.id },
       include: {
-        patient: true,
+        patient: { include: { vitals: true } },
         doctor: { include: { user: true } },
         items: true,
-      },
+        clinic: true,
+      }
     });
 
-    return NextResponse.json(completeRx, { status: 201 });
+    return NextResponse.json(completePrescription, { status: 201 });
   } catch (error: any) {
-    console.error('Error saving prescription:', error);
+    console.error('Error creating prescription in Postgres DB:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

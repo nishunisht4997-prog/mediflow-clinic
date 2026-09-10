@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Globe,
   Stethoscope,
@@ -20,6 +20,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { LiveQueueTicker } from '@/components/public/LiveQueueTicker';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 interface ClinicWebsitePreviewProps {
   clinicData?: any;
@@ -30,7 +31,7 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
   clinicData,
   onBookPublicSlot,
 }) => {
-  const [selectedBranch, setSelectedBranch] = useState('Saheed Nagar Main Polyclinic');
+  const [selectedBranch, setSelectedBranch] = useState(CLINIC_CONFIG.branches[0]?.name || 'Saheed Nagar Main Branch');
   const [patientName, setPatientName] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -38,6 +39,46 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
   const [reason, setReason] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [tokenAssigned, setTokenAssigned] = useState<number | null>(null);
+
+  // Live Queue Stats
+  const [liveQueueStats, setLiveQueueStats] = useState({
+    currentToken: 1,
+    waitingCount: 0,
+    estimatedWaitMins: 0,
+  });
+
+  const fetchLiveQueue = async () => {
+    try {
+      const res = await fetch('/api/appointments');
+      const appts = await res.json();
+      if (Array.isArray(appts)) {
+        const inConsultation = appts.find((a: any) => a.status === 'IN_CONSULTATION');
+        const waiting = appts.filter((a: any) => a.status === 'WAITING');
+        const completed = appts.filter((a: any) => a.status === 'COMPLETED');
+        
+        let tokenNow = 1;
+        if (inConsultation) {
+          tokenNow = inConsultation.tokenNumber;
+        } else if (waiting.length > 0) {
+          tokenNow = waiting[0].tokenNumber;
+        } else if (completed.length > 0) {
+          tokenNow = completed[0].tokenNumber;
+        }
+
+        setLiveQueueStats({
+          currentToken: tokenNow,
+          waitingCount: waiting.length,
+          estimatedWaitMins: waiting.length * 12,
+        });
+      }
+    } catch (e) {
+      console.error('Error in ClinicWebsitePreview live queue:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveQueue();
+  }, []);
 
   const treatments = [
     {
@@ -76,7 +117,7 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
       rating: 5,
       date: '18 Aug 2026',
       treatment: 'Kidney Stone Management',
-      text: 'Dr. Avishek explained the laser procedure clearly. Pain was gone within 24 hours. The WhatsApp prescription and digital appointment system is super convenient.',
+      text: `${CLINIC_CONFIG.doctorName} explained the treatment procedure clearly. Pain was gone within 24 hours. The WhatsApp prescription and digital appointment system is super convenient.`,
     },
     {
       name: 'Snigdha Patnaik',
@@ -131,13 +172,13 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
           </div>
           <h2 className="text-xl font-black">Public Doctor Profile & Online Booking Portal</h2>
           <p className="text-xs text-slate-300 mt-1 max-w-xl">
-            Live URL: <code className="bg-black/30 px-2 py-0.5 rounded text-sky-300 font-mono">dravishek.mediflow.in</code>.
+            Live URL: <code className="bg-black/30 px-2 py-0.5 rounded text-sky-300 font-mono">drpriyabarta.mediflow.in</code>.
             Patients can check live waiting room queue token, explore treatments, and book verified OPD slots.
           </p>
         </div>
 
         <a
-          href="/clinic/dr-avishek-clinic"
+          href="/clinic/dr-priyabarta-clinic"
           target="_blank"
           className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-900 shadow-md hover:bg-slate-100 transition shrink-0"
         >
@@ -156,22 +197,26 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
             <div className="h-3 w-3 rounded-full bg-emerald-400" />
           </div>
           <div className="flex-1 max-w-md mx-auto bg-white rounded-lg px-3 py-1 text-xs text-slate-600 font-mono text-center border border-slate-200">
-            https://dravishek.mediflow.in
+            https://drpriyabarta.mediflow.in
           </div>
         </div>
 
         {/* Website Content */}
         <div className="p-8 space-y-10">
           {/* Live Queue Status Ticker */}
-          <LiveQueueTicker currentToken={3} waitingCount={4} estimatedWaitMins={12} />
+          <LiveQueueTicker
+            currentToken={liveQueueStats.currentToken}
+            waitingCount={liveQueueStats.waitingCount}
+            estimatedWaitMins={liveQueueStats.estimatedWaitMins}
+          />
 
           {/* Hero Doctor Card */}
           <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-slate-100">
             <div className="relative">
               <div className="h-36 w-36 rounded-3xl overflow-hidden shadow-xl border-4 border-white">
                 <img
-                  src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300&auto=format&fit=crop&q=80"
-                  alt="Dr. Avishek Mohapatra"
+                  src={CLINIC_CONFIG.doctorPhoto}
+                  alt={CLINIC_CONFIG.doctorName}
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -182,28 +227,28 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
 
             <div className="space-y-2 text-center md:text-left flex-1">
               <div className="flex items-center justify-center md:justify-start gap-2">
-                <h1 className="text-2xl font-black text-slate-900">Dr. Avishek Mohapatra</h1>
+                <h1 className="text-2xl font-black text-slate-900">{CLINIC_CONFIG.doctorName}</h1>
                 <span className="rounded-md bg-sky-100 text-sky-800 text-xs font-bold px-2 py-0.5">
                   Verified Doctor
                 </span>
               </div>
 
               <p className="text-sm font-bold text-sky-700">
-                MBBS, MD (General Medicine), DNB (Urology) &bull; 12+ Years Exp.
+                {CLINIC_CONFIG.qualifications} &bull; {CLINIC_CONFIG.experienceYears}+ Years Exp.
               </p>
               <p className="text-xs text-slate-500 max-w-lg">
-                Senior Consultant Urologist & Specialist Physician. Specialized in kidney stones, prostate health, urinary tract infections, diabetes and hypertension management.
+                {CLINIC_CONFIG.aboutDoctor}
               </p>
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs font-medium text-slate-600 pt-2">
                 <span className="flex items-center gap-1 text-amber-500 font-bold">
-                  <Star className="h-4 w-4 fill-current" /> 4.9 (420+ Reviews)
+                  <Star className="h-4 w-4 fill-current" /> {CLINIC_CONFIG.rating} ({CLINIC_CONFIG.totalReviews}+ Reviews)
                 </span>
                 <span className="flex items-center gap-1 font-mono font-bold text-slate-900">
-                  Fee: ₹800 (Consultation)
+                  Fee: ₹{CLINIC_CONFIG.consultationFee} (Consultation)
                 </span>
                 <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-                  <ShieldCheck className="h-4 w-4" /> Reg: MCI/OD/2014/09842
+                  <ShieldCheck className="h-4 w-4" /> Reg: {CLINIC_CONFIG.regNumber}
                 </span>
               </div>
             </div>
@@ -310,7 +355,7 @@ export const ClinicWebsitePreview: React.FC<ClinicWebsitePreviewProps> = ({
                   <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto" />
                   <h4 className="text-base font-bold">Appointment Confirmed!</h4>
                   <p className="text-xs">
-                    Your appointment with Dr. Avishek is booked for <strong>{selectedDate} ({selectedSlot})</strong>.
+                    Your appointment with {CLINIC_CONFIG.doctorShortName} is booked for <strong>{selectedDate} ({selectedSlot})</strong>.
                   </p>
                   <div className="text-sm font-black text-emerald-800 font-mono">
                     Assigned Token #{tokenAssigned}

@@ -15,6 +15,8 @@ import {
   Pill,
   Users,
 } from 'lucide-react';
+import { PrescriptionPdfPreview } from '@/components/prescription/PrescriptionPdfPreview';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 import { VitalsTrendChart } from '@/components/portal/VitalsTrendChart';
 
 interface PatientPortalViewProps {
@@ -27,6 +29,35 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   onViewPrescriptionPdf,
 }) => {
   const [selectedUhid, setSelectedUhid] = useState(patients[0]?.uhid || 'MF-2026-0001');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchInput.trim();
+    if (!query) {
+      setSearchError('Please enter a mobile number, UHID, or email.');
+      return;
+    }
+
+    const cleanDigits = query.replace(/[^0-9]/g, '');
+    const match = patients.find((p) => {
+      const pDigits = (p.phone || '').replace(/[^0-9]/g, '');
+      const matchPhone = cleanDigits.length >= 4 && (pDigits.includes(cleanDigits) || cleanDigits.includes(pDigits.slice(-10)));
+      const matchUhid = p.uhid?.toLowerCase() === query.toLowerCase();
+      const matchEmail = p.email && p.email.toLowerCase() === query.toLowerCase();
+      const matchName = p.name?.toLowerCase().includes(query.toLowerCase());
+      return matchPhone || matchUhid || matchEmail || matchName;
+    });
+
+    if (match) {
+      setSelectedUhid(match.uhid);
+      setSearchError(null);
+    } else {
+      setSearchError(`No patient record found for "${query}".`);
+    }
+  };
+
   const patient = patients.find((p) => p.uhid === selectedUhid) || patients[0];
 
   const medicineSchedule = [
@@ -37,34 +68,77 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-purple-900 to-indigo-900 p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-300 border border-purple-400/30 mb-2">
-            <Smartphone className="h-3.5 w-3.5" />
-            <span>Patient Self-Service Digital Portal</span>
+      {/* Top Banner & Search */}
+      <div className="rounded-3xl bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-300 border border-purple-400/30 mb-2">
+              <Smartphone className="h-3.5 w-3.5" />
+              <span>Patient Self-Service Digital Portal</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black">Search & Access Patient Health Locker</h2>
+            <p className="text-xs text-purple-200/80 mt-1 max-w-xl">
+              Enter registered 10-digit Mobile Number, UHID, or Email to view digital prescriptions, vitals trajectory, and bills.
+            </p>
           </div>
-          <h2 className="text-xl font-black">Secure Patient Health Locker & Biomarker Dashboard</h2>
-          <p className="text-xs text-slate-300 mt-1 max-w-xl">
-            View historical BP/Pulse curves, daily medicine schedule, digital prescriptions, and download consolidated medical passport.
-          </p>
+
+          {patient && (
+            <div className="flex items-center gap-2 bg-white/10 px-3 py-2 rounded-2xl backdrop-blur-md">
+              <span className="text-xs font-bold text-white">{patient.name}</span>
+              <span className="text-[10px] text-purple-200 font-mono">({patient.uhid})</span>
+            </div>
+          )}
         </div>
 
-        {/* Demo Patient Switcher */}
-        <div className="flex items-center gap-2 bg-white/10 p-2 rounded-xl backdrop-blur-md">
-          <span className="text-xs font-semibold text-purple-200">Patient:</span>
-          <select
-            value={selectedUhid}
-            onChange={(e) => setSelectedUhid(e.target.value)}
-            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-900 focus:outline-hidden"
+        {/* Search Bar */}
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-purple-300" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Enter 10-digit Mobile (+91), UHID (MF-2026-0001) or Email..."
+              className="w-full rounded-2xl border border-white/20 bg-white/10 pl-10 pr-4 py-2.5 text-xs sm:text-sm font-semibold text-white placeholder-purple-300/60 focus:bg-white focus:text-slate-900 focus:outline-hidden backdrop-blur-md transition"
+            />
+          </div>
+          <button
+            type="submit"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-purple-500 hover:bg-purple-400 text-white px-5 py-2.5 text-xs sm:text-sm font-bold shadow-lg shadow-purple-500/30 transition shrink-0"
           >
-            {patients.map((p) => (
-              <option key={p.id} value={p.uhid}>
-                {p.name} ({p.uhid})
-              </option>
-            ))}
-          </select>
+            <Search className="h-4 w-4" />
+            <span>Search Records</span>
+          </button>
+        </form>
+
+        {/* Quick Demo Profile Chips */}
+        <div className="pt-2 border-t border-white/10 flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-[11px] font-semibold text-purple-300">Quick Profiles:</span>
+          {patients.slice(0, 4).map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setSelectedUhid(p.uhid);
+                setSearchInput(p.phone || p.uhid);
+                setSearchError(null);
+              }}
+              className={`rounded-xl px-2.5 py-1 text-[11px] font-bold border transition ${
+                selectedUhid === p.uhid
+                  ? 'bg-purple-500 text-white border-purple-400'
+                  : 'bg-white/10 text-purple-200 border-white/15 hover:bg-white/20'
+              }`}
+            >
+              {p.name} ({p.uhid})
+            </button>
+          ))}
         </div>
+
+        {searchError && (
+          <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs font-semibold">
+            {searchError}
+          </div>
+        )}
       </div>
 
       {patient && (
@@ -162,7 +236,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                       <div>
                         <div className="font-bold text-xs text-slate-900">Diagnosis: {rx.diagnosis}</div>
                         <div className="text-[11px] text-slate-400">
-                          Prescribed by Dr. Avishek &bull; Date: {rx.createdAt?.split('T')[0]}
+                          Prescribed by {CLINIC_CONFIG.doctorShortName} &bull; Date: {rx.createdAt?.split('T')[0]}
                         </div>
                       </div>
 

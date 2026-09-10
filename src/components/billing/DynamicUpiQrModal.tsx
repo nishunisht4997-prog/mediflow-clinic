@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { QrCode, X, CheckCircle2, Copy, Check, Smartphone, IndianRupee } from 'lucide-react';
 import { generateUpiUri, getQrCodeImageUrl } from '@/lib/upi';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 interface DynamicUpiQrModalProps {
   invoice: any;
@@ -18,9 +19,9 @@ export const DynamicUpiQrModal: React.FC<DynamicUpiQrModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const amountToCollect = invoice?.totalAmount - (invoice?.paidAmount || 0) || 800;
-  const vpa = 'dravishekclinic@hdfcbank';
-  const clinicName = "Dr. Avishek's Healthcare & Polyclinic";
+  const amountToCollect = invoice?.totalAmount - (invoice?.paidAmount || 0) || CLINIC_CONFIG.consultationFee;
+  const vpa = 'genicaclinic@hdfcbank';
+  const clinicName = CLINIC_CONFIG.clinicName;
 
   const upiUri = generateUpiUri({
     vpa,

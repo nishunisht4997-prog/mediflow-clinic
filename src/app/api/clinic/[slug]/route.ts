@@ -5,17 +5,34 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   try {
     const { slug } = await params;
 
-    const clinic = await prisma.clinic.findUnique({
-      where: { slug },
-      include: {
-        branches: true,
-        doctors: {
-          include: {
-            user: true,
-          }
+    const clinic =
+      (await prisma.clinic.findFirst({
+        where: {
+          OR: [
+            { slug },
+            { slug: 'dr-priyabarta-clinic' },
+            { slug: 'dr-avishek-clinic' },
+          ],
         },
-      },
-    });
+        include: {
+          branches: true,
+          doctors: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      })) ||
+      (await prisma.clinic.findFirst({
+        include: {
+          branches: true,
+          doctors: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      }));
 
     if (!clinic) {
       return NextResponse.json({ error: 'Clinic not found' }, { status: 404 });

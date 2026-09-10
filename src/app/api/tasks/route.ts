@@ -18,6 +18,7 @@ export async function GET() {
 
     return NextResponse.json(tasks);
   } catch (error: any) {
+    console.error('Error fetching clinic tasks:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -28,14 +29,29 @@ export async function POST(request: Request) {
     const clinic = await prisma.clinic.findFirst();
     if (!clinic) return NextResponse.json({ error: 'Clinic not found' }, { status: 404 });
 
+    const validAssignedTo =
+      body.assignedTo && typeof body.assignedTo === 'string' && body.assignedTo.trim() !== ''
+        ? body.assignedTo.trim()
+        : null;
+
+    const validCreatedBy =
+      body.createdBy && typeof body.createdBy === 'string' && body.createdBy.trim() !== ''
+        ? body.createdBy.trim()
+        : null;
+
+    const validPatientId =
+      body.patientId && typeof body.patientId === 'string' && body.patientId.trim() !== ''
+        ? body.patientId.trim()
+        : null;
+
     const task = await prisma.clinicTask.create({
       data: {
         clinicId: clinic.id,
         title: body.title,
         description: body.description || null,
-        assignedTo: body.assignedTo || null,
-        createdBy: body.createdBy || null,
-        patientId: body.patientId || null,
+        assignedTo: validAssignedTo,
+        createdBy: validCreatedBy,
+        patientId: validPatientId,
         priority: body.priority || 'MEDIUM',
         dueDate: body.dueDate || 'Today 5:00 PM',
         status: body.status || 'PENDING',
@@ -43,11 +59,12 @@ export async function POST(request: Request) {
       include: {
         assignee: true,
         patient: true,
-      }
+      },
     });
 
     return NextResponse.json(task, { status: 201 });
   } catch (error: any) {
+    console.error('Error creating clinic task in Neon DB:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

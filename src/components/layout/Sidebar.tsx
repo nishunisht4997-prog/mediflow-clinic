@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const externalPortals = [
-    { name: 'Public Clinic Site', href: '/clinic/dr-avishek-clinic', icon: Globe, sub: 'dravishek.mediflow.in' },
+    { name: 'Public Clinic Site', href: '/clinic/dr-priyabarta-clinic', icon: Globe, sub: 'drpriyabarta.mediflow.in' },
     { name: 'Patient Health Portal', href: '/portal', icon: Smartphone, sub: 'Self-Service' },
   ];
 

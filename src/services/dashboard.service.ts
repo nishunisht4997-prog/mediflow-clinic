@@ -1,16 +1,33 @@
 import { prisma } from '@/lib/prisma';
 
+import { CLINIC_CONFIG } from '@/config/clinic.config';
+
 export class DashboardService {
-  static async getStats(clinicSlug = 'dr-avishek-clinic') {
+  static async getStats(clinicSlug = 'dr-priyabarta-clinic') {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const clinic = await prisma.clinic.findFirst({
-      where: { slug: clinicSlug },
-      include: {
-        branches: true,
-        doctors: { include: { user: true } },
-      },
-    });
+    const clinic =
+      (await prisma.clinic.findFirst({
+        where: clinicSlug
+          ? {
+              OR: [
+                { slug: clinicSlug },
+                { slug: 'dr-priyabarta-clinic' },
+                { slug: 'dr-avishek-clinic' },
+              ],
+            }
+          : undefined,
+        include: {
+          branches: true,
+          doctors: { include: { user: true } },
+        },
+      })) ||
+      (await prisma.clinic.findFirst({
+        include: {
+          branches: true,
+          doctors: { include: { user: true } },
+        },
+      }));
 
     if (!clinic) throw new Error('Clinic not found');
 
@@ -79,7 +96,7 @@ export class DashboardService {
         id: clinic.id,
         name: clinic.name,
         slug: clinic.slug,
-        doctorName: clinic.doctors[0]?.user?.name || 'Dr. Avishek Mohapatra',
+        doctorName: clinic.doctors[0]?.user?.name || CLINIC_CONFIG.doctorName,
         consultationFee: clinic.consultationFee,
         currencySymbol: clinic.currencySymbol,
       },

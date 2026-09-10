@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { DigitalPrescriptionMaker } from '@/components/prescription/DigitalPrescriptionMaker';
 import { PrescriptionPdfPreview } from '@/components/prescription/PrescriptionPdfPreview';
+import { ClinicBroadcast } from '@/lib/broadcast';
 
 export default function PrescriptionsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -37,6 +38,21 @@ export default function PrescriptionsPage() {
       body: JSON.stringify(prescriptionData),
     });
     const created = await res.json();
+
+    // 🚀 REAL-TIME BROADCAST: Notify Accountant & Reception that Rx is ready
+    ClinicBroadcast.publish({
+      type: 'PRESCRIPTION_GENERATED',
+      title: `Rx Generated: ${created.patient?.name || 'Patient'}`,
+      message: `Digital Rx for "${created.diagnosis}" saved. Ready for pharmacy & discharge.`,
+      sourceRole: 'DOCTOR',
+      targetRoles: ['ACCOUNTANT', 'RECEPTIONIST'],
+      data: {
+        patientId: created.patientId,
+        patientName: created.patient?.name,
+        diagnosis: created.diagnosis,
+      },
+    });
+
     return created;
   };
 

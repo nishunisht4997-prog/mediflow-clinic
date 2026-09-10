@@ -25,7 +25,7 @@ interface AppointmentsQueueViewProps {
 }
 
 export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
-  appointments,
+  appointments = [],
   onOpenNewBooking,
   onUpdateStatus,
   onStartConsultation,
@@ -33,13 +33,16 @@ export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
-  const filtered = appointments.filter((a) => {
+  const filtered = (appointments || []).filter((a) => {
     if (filterStatus === 'ALL') return true;
     return a.status === filterStatus;
   });
 
-  const waitingList = appointments.filter((a) => a.status === 'WAITING' || a.status === 'IN_CONSULTATION');
-  const completedList = appointments.filter((a) => a.status === 'COMPLETED');
+  const waitingList = (appointments || []).filter(
+    (a) => a.status === 'WAITING' || a.status === 'IN_CONSULTATION'
+  );
+  const completedList = (appointments || []).filter((a) => a.status === 'COMPLETED');
+  const activeConsultation = (appointments || []).find((a) => a.status === 'IN_CONSULTATION');
 
   return (
     <div className="space-y-6 pb-12">
@@ -75,18 +78,25 @@ export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
             <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs">{waitingList.length}</span>
           </div>
           <div className="mt-3 flex items-center gap-2 flex-wrap">
-            {waitingList.map((w) => (
-              <span
-                key={w.id}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold font-mono shadow-xs ${
-                  w.status === 'IN_CONSULTATION'
-                    ? 'bg-sky-600 text-white animate-pulse'
-                    : 'bg-white border border-amber-300 text-amber-900'
-                }`}
-              >
-                #{w.tokenNumber} {w.patient.name.split(' ')[0]}
-              </span>
-            ))}
+            {waitingList.map((w) => {
+              const displayName = w.patient?.name
+                ? w.patient.name.split(' ')[0]
+                : w.patientName
+                ? w.patientName.split(' ')[0]
+                : 'Patient';
+              return (
+                <span
+                  key={w.id}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold font-mono shadow-xs ${
+                    w.status === 'IN_CONSULTATION'
+                      ? 'bg-sky-600 text-white animate-pulse'
+                      : 'bg-white border border-amber-300 text-amber-900'
+                  }`}
+                >
+                  #{w.tokenNumber} {displayName}
+                </span>
+              );
+            })}
           </div>
         </div>
 
@@ -96,10 +106,10 @@ export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
             <span>CURRENTLY WITH DOCTOR</span>
             <span className="h-2 w-2 rounded-full bg-sky-600 animate-ping" />
           </div>
-          {appointments.find((a) => a.status === 'IN_CONSULTATION') ? (
+          {activeConsultation ? (
             <div className="mt-2 text-sm font-bold text-slate-800">
-              Token #{appointments.find((a) => a.status === 'IN_CONSULTATION')?.tokenNumber} &bull;{' '}
-              {appointments.find((a) => a.status === 'IN_CONSULTATION')?.patient?.name}
+              Token #{activeConsultation.tokenNumber} &bull;{' '}
+              {activeConsultation.patient?.name || activeConsultation.patientName || 'In Consultation'}
             </div>
           ) : (
             <div className="mt-2 text-xs text-slate-400">No patient in consultation cabin right now.</div>
@@ -142,6 +152,11 @@ export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
             const isWaiting = item.status === 'WAITING';
             const isInCons = item.status === 'IN_CONSULTATION';
             const isDone = item.status === 'COMPLETED';
+            const patientName = item.patient?.name || item.patientName || 'OPD Walk-In Patient';
+            const patientAge = item.patient?.age ? `${item.patient.age}y` : '--';
+            const patientGender = item.patient?.gender || 'General';
+            const patientUhid = item.patient?.uhid || `TKN-${item.tokenNumber}`;
+            const patientPhone = item.patient?.phone || item.phone || '+91 98765 43210';
 
             return (
               <div
@@ -167,11 +182,11 @@ export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-900">{item.patient.name}</span>
+                      <span className="font-extrabold text-sm text-slate-900">{patientName}</span>
                       <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600">
-                        {item.patient.age}y / {item.patient.gender}
+                        {patientAge} / {patientGender}
                       </span>
-                      <span className="text-xs font-mono text-sky-700 font-semibold">{item.patient.uhid}</span>
+                      <span className="text-xs font-mono text-sky-700 font-semibold">{patientUhid}</span>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
@@ -184,7 +199,7 @@ export const AppointmentsQueueView: React.FC<AppointmentsQueueViewProps> = ({
                       <span>&bull;</span>
                       <span className="flex items-center gap-1 font-mono text-slate-600">
                         <Phone className="h-3 w-3 text-slate-400" />
-                        {item.patient.phone}
+                        {patientPhone}
                       </span>
                     </div>
 

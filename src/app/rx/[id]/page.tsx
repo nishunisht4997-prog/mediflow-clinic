@@ -13,8 +13,11 @@ import {
   Building2,
   Clock,
   ArrowLeft,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import Link from 'next/link';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 export default function PublicRxViewPage() {
   const params = useParams();
@@ -22,6 +25,8 @@ export default function PublicRxViewPage() {
   const [rx, setRx] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -43,6 +48,77 @@ export default function PublicRxViewPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // Direct 1-Click Client-Side PDF File Download
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const element = document.getElementById('printable-area');
+      if (!element) {
+        window.print();
+        return;
+      }
+
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const safePatientName = (rx.patient?.name || 'Patient').replace(/\s+/g, '_');
+      pdf.save(`Prescription_${safePatientName}_${rx.id?.slice(0, 6) || 'Rx'}.pdf`);
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      window.print();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Prescription for ${rx.patient?.name || 'Patient'}`,
+          text: `Verified Digital Prescription from ${CLINIC_CONFIG.clinicName}`,
+          url: window.location.href,
+        });
+        return;
+      } catch (err) {}
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   if (loading) {
@@ -77,17 +153,17 @@ export default function PublicRxViewPage() {
   }
 
   const doctor = rx.doctor || {
-    qualifications: 'MBBS, MD (General Medicine), DNB (Urology)',
-    specialization: 'Senior Physician & Consultant Urologist',
-    regNumber: 'MCI/OD/2014/09842',
-    user: { name: 'Dr. Avishek Mohapatra' },
+    qualifications: CLINIC_CONFIG.qualifications,
+    specialization: CLINIC_CONFIG.specialization,
+    regNumber: CLINIC_CONFIG.regNumber,
+    user: { name: CLINIC_CONFIG.doctorName },
   };
 
   const patient = rx.patient || {};
   const clinic = rx.clinic || {
-    name: "Dr. Avishek's Healthcare & Polyclinic",
-    address: 'Plot 104, Saheed Nagar, Janpath Road, Bhubaneswar, Odisha',
-    phone: '+91 98765 43210',
+    name: CLINIC_CONFIG.clinicName,
+    address: CLINIC_CONFIG.address,
+    phone: CLINIC_CONFIG.phone,
   };
 
   const items = rx.items || [];
@@ -95,22 +171,61 @@ export default function PublicRxViewPage() {
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800 p-4 md:p-8">
       {/* Action Header */}
-      <div className="max-w-3xl mx-auto mb-4 flex items-center justify-between no-print">
+      <div className="max-w-3xl mx-auto mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
         <Link
           href="/portal"
-          className="flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs w-fit"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Patient Health Portal</span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Direct 1-Click PDF Download Button */}
+          <button
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-700 transition"
+            title="Download Prescription as PDF to your device"
+          >
+            {isDownloadingPdf ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                <span>Download PDF</span>
+              </>
+            )}
+          </button>
+
+          {/* Print Letterhead */}
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-sky-700 transition"
           >
             <Printer className="h-4 w-4" />
-            <span>Download / Print Official PDF</span>
+            <span>Print</span>
+          </button>
+
+          {/* Share Button */}
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+          >
+            {copied ? (
+              <>
+                <Check className="h-4 w-4 text-emerald-600" />
+                <span className="text-emerald-700">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="h-4 w-4 text-slate-600" />
+                <span>Share</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -124,7 +239,7 @@ export default function PublicRxViewPage() {
         <div className="flex items-start justify-between border-b-2 border-sky-600 pb-4">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-sky-950">
-              {doctor.user?.name || 'Dr. Avishek Mohapatra'}
+              {doctor.user?.name || CLINIC_CONFIG.doctorName}
             </h1>
             <p className="text-xs font-bold text-sky-700">{doctor.qualifications}</p>
             <p className="text-xs text-slate-600">{doctor.specialization}</p>
@@ -158,65 +273,53 @@ export default function PublicRxViewPage() {
           </div>
           <div>
             <span className="text-slate-400 font-medium">Date:</span>
-            <div className="font-bold text-slate-900">{rx.createdAt?.split('T')[0]}</div>
+            <div className="font-mono font-semibold text-slate-900">
+              {new Date(rx.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+            </div>
           </div>
         </div>
 
-        {/* Diagnosis */}
-        <div className="border-l-4 border-sky-600 bg-sky-50/50 p-3.5 text-xs rounded-r-xl">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-sky-800">
-            Primary Diagnosis:
-          </div>
-          <div className="text-base font-bold text-slate-900 mt-0.5">{rx.diagnosis}</div>
+        {/* Symptoms & Diagnosis */}
+        <div className="space-y-3">
           {rx.symptoms && (
-            <div className="text-slate-600 mt-1">
-              <strong>Symptoms:</strong> {rx.symptoms}
+            <div>
+              <span className="text-xs font-bold text-slate-700">Symptoms: </span>
+              <span className="text-xs text-slate-600">{rx.symptoms}</span>
             </div>
           )}
+
+          <div>
+            <span className="text-xs font-bold text-slate-700">Diagnosis (ICD): </span>
+            <span className="text-xs font-black text-sky-900">{rx.diagnosis}</span>
+          </div>
         </div>
 
-        {/* Medicines */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="font-serif text-2xl font-black text-sky-900">℞</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Prescribed Medicines ({items.length})
-            </span>
-          </div>
-
+        {/* Prescription Table */}
+        <div className="space-y-2">
+          <div className="font-serif italic font-black text-2xl text-sky-800">℞</div>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-300 text-slate-500 uppercase text-[10px] font-bold">
+              <tr className="border-b-2 border-slate-200 text-slate-500 uppercase text-[10px]">
                 <th className="py-2">#</th>
                 <th className="py-2">Medicine Name</th>
-                <th className="py-2">Dosage</th>
                 <th className="py-2">Frequency</th>
                 <th className="py-2">Timing</th>
                 <th className="py-2">Duration</th>
                 <th className="py-2">Instructions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
-              {items.map((med: any, idx: number) => (
-                <tr key={idx} className="hover:bg-slate-50">
-                  <td className="py-2.5 font-mono text-slate-400">{idx + 1}</td>
-                  <td className="py-2.5 font-bold text-slate-900">
-                    {med.medicineName}
-                    <span className="ml-1 text-[10px] font-normal text-slate-500">
-                      ({med.form})
-                    </span>
-                  </td>
-                  <td className="py-2.5 font-semibold text-slate-700">{med.dosage}</td>
+            <tbody className="divide-y divide-slate-100">
+              {items.map((item: any, idx: number) => (
+                <tr key={item.id || idx}>
+                  <td className="py-2.5 text-slate-400 font-bold">{idx + 1}</td>
                   <td className="py-2.5">
-                    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">
-                      {med.frequency}
-                    </span>
+                    <div className="font-bold text-slate-900">{item.medicineName}</div>
+                    <div className="text-[10px] text-slate-400">{item.form} &bull; {item.dosage}</div>
                   </td>
-                  <td className="py-2.5 font-medium text-slate-700">{med.timing}</td>
-                  <td className="py-2.5 font-bold text-slate-900">{med.durationDays} Days</td>
-                  <td className="py-2.5 text-slate-500 text-[11px]">
-                    {med.instructions || '—'}
-                  </td>
+                  <td className="py-2.5 font-bold font-mono text-sky-800">{item.frequency}</td>
+                  <td className="py-2.5 text-slate-600">{item.timing}</td>
+                  <td className="py-2.5 font-medium">{item.durationDays} Days</td>
+                  <td className="py-2.5 text-slate-500 italic">{item.instructions || '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -224,56 +327,69 @@ export default function PublicRxViewPage() {
         </div>
 
         {/* Advice & Tests */}
-        {(rx.advice || rx.investigationsAdvised) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200 text-xs">
-            {rx.advice && (
-              <div className="space-y-1">
-                <span className="font-bold text-slate-800 uppercase text-[10px]">
-                  Doctor Advice:
-                </span>
-                <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  {rx.advice}
-                </p>
-              </div>
-            )}
-
-            {rx.investigationsAdvised && (
-              <div className="space-y-1">
-                <span className="font-bold text-slate-800 uppercase text-[10px]">
-                  Lab Tests Advised:
-                </span>
-                <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-medium">
-                  {rx.investigationsAdvised}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Doctor Signature */}
-        <div className="flex items-end justify-between pt-8 border-t-2 border-slate-200 mt-6">
-          <div>
-            {rx.nextFollowUpDate && (
-              <div className="text-xs">
-                <span className="text-slate-500">Next Follow-Up Date: </span>
-                <strong className="text-purple-700 font-bold underline">
-                  {rx.nextFollowUpDate}
-                </strong>
-              </div>
-            )}
-            <div className="text-[10px] text-emerald-700 font-bold mt-2 flex items-center gap-1">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>Digitally Verified &bull; Valid Under Information Technology Act 2000</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2">
+          {rx.investigationsAdvised && (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <span className="font-bold text-slate-800 block mb-1">Investigations Advised:</span>
+              <p className="text-slate-600">{rx.investigationsAdvised}</p>
             </div>
+          )}
+
+          {rx.advice && (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <span className="font-bold text-slate-800 block mb-1">Diet & Lifestyle Advice:</span>
+              <p className="text-slate-600">{rx.advice}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="pt-6 border-t-2 border-slate-200 flex items-end justify-between text-xs">
+          <div>
+            {(rx.followUpDays || rx.nextFollowUpDate) && (
+              <div className="inline-block rounded-xl bg-purple-50 border border-purple-200 px-4 py-2 text-purple-950">
+                <div className="text-[10px] uppercase text-purple-700 font-extrabold tracking-wider">
+                  Next Follow-Up / Review:
+                </div>
+                <div className="text-xs font-bold text-purple-950 mt-0.5">
+                  Next Visit:{' '}
+                  <strong className="text-purple-900 underline underline-offset-2">
+                    {(() => {
+                      if (rx.nextFollowUpDate) {
+                        return new Date(rx.nextFollowUpDate).toLocaleDateString('en-IN', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        });
+                      }
+                      const d = rx.createdAt ? new Date(rx.createdAt) : new Date();
+                      d.setDate(d.getDate() + (rx.followUpDays || 7));
+                      return d.toLocaleDateString('en-IN', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      });
+                    })()}
+                  </strong>{' '}
+                  <span className="text-purple-600 font-semibold text-[11px]">
+                    (After {rx.followUpDays || 7} Days)
+                  </span>
+                </div>
+              </div>
+            )}
+            <p className="text-[10px] text-slate-400 mt-2">
+              Digitally issued & verified prescription via {clinic.name}.
+            </p>
           </div>
 
           <div className="text-center space-y-1">
-            <div className="font-serif italic font-bold text-sky-800 text-sm border-b border-slate-400 pb-1 px-4">
-              Dr. Avishek Mohapatra
+            <div className="font-serif italic font-bold text-sky-900 text-sm">
+              {doctor.user?.name || CLINIC_CONFIG.doctorName}
             </div>
-            <div className="text-[10px] font-bold text-slate-600 uppercase">
-              Consultant Signature & Stamp
-            </div>
+            <div className="w-32 border-t border-slate-400 mx-auto" />
+            <div className="text-[9px] text-slate-400 uppercase font-semibold">Authorized Signature</div>
           </div>
         </div>
       </div>

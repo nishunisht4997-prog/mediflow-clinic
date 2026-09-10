@@ -201,12 +201,13 @@ export const BillingInvoicesView: React.FC<BillingInvoicesViewProps> = ({
                       <span>80mm Slip</span>
                     </button>
 
-                    {isPartial && (
+                    {inv.totalAmount - (inv.paidAmount || 0) > 0 && (
                       <button
                         onClick={() => onRecordPayment(inv)}
-                        className="rounded-lg bg-teal-50 border border-teal-200 px-3 py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-100 transition"
+                        className="rounded-lg bg-teal-50 border border-teal-200 px-3 py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-100 transition shadow-2xs flex items-center gap-1"
+                        title="1-Click collect balance due"
                       >
-                        Collect Due
+                        <span>Collect Due</span>
                       </button>
                     )}
 

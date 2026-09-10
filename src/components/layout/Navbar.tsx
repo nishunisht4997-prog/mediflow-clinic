@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UserRole } from '@/types';
+import { RoleAuthModal } from '@/components/auth/RoleAuthModal';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
+import { LiveNotificationCenter } from '@/components/notifications/LiveNotificationCenter';
 
 interface NavbarProps {
   currentRole: UserRole;
@@ -28,6 +31,7 @@ interface NavbarProps {
   onOpenNewAppointment?: () => void;
   onOpenNewPrescription?: () => void;
   onOpenQuickSearch?: () => void;
+  onNotificationAction?: (type: string, data: any) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -38,11 +42,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewAppointment,
   onOpenNewPrescription,
   onOpenQuickSearch,
+  onNotificationAction,
 }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState('Saheed Nagar Main Branch');
+  const [selectedBranch, setSelectedBranch] = useState(CLINIC_CONFIG.branches[0]?.name || 'Saheed Nagar Main Branch');
+  const [authTargetProfile, setAuthTargetProfile] = useState<any | null>(null);
 
   const roleProfiles: {
     role: UserRole;
@@ -53,8 +59,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   }[] = [
     {
       role: 'DOCTOR',
-      name: 'Dr. Avishek Mohapatra',
-      designation: 'Senior Consultant Physician & Urologist',
+      name: CLINIC_CONFIG.doctorName,
+      designation: CLINIC_CONFIG.specialization,
       badgeColor: 'bg-sky-500',
       route: '/',
     },
@@ -85,8 +91,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     roleProfiles.find((p) => p.role === currentRole) || roleProfiles[0];
 
   const handleSwitchRole = (profile: (typeof roleProfiles)[0]) => {
-    setCurrentRole(profile.role);
     setShowRoleDropdown(false);
+    if (profile.role === currentRole) {
+      router.push(profile.route);
+      return;
+    }
+    // Open staff PIN/password auth modal
+    setAuthTargetProfile(profile);
+  };
+
+  const handleAuthSuccess = (profile: (typeof roleProfiles)[0]) => {
+    setCurrentRole(profile.role);
+    setAuthTargetProfile(null);
     router.push(profile.route);
   };
 
@@ -110,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-slate-900 leading-none">
-              <span className="truncate max-w-[140px] sm:max-w-none">Dr. Avishek's Clinic</span>
+              <span className="truncate max-w-[140px] sm:max-w-none">{CLINIC_CONFIG.shortName}</span>
               <span className="hidden sm:inline-block rounded-full bg-sky-100 px-2 py-0.2 text-[10px] font-bold text-sky-800">
                 PRO
               </span>
@@ -124,8 +140,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onChange={(e) => setSelectedBranch(e.target.value)}
                 className="bg-transparent font-medium text-slate-600 focus:outline-hidden cursor-pointer truncate max-w-[120px] sm:max-w-none"
               >
-                <option value="Saheed Nagar Main Branch">Saheed Nagar (Bhubaneswar)</option>
-                <option value="CDA Sector 9 Branch">CDA Sector 9 (Cuttack)</option>
+                {CLINIC_CONFIG.branches.map((b) => (
+                  <option key={b.name} value={b.name}>
+                    {b.name.replace(' Branch', '')} ({b.city})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -179,6 +198,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
         </div>
+
+        {/* Real-time Notification Bell & Live Toast Center */}
+        <LiveNotificationCenter
+          currentRole={currentRole}
+          onActionClick={onNotificationAction}
+        />
 
         {/* Dynamic Role Switcher Dropdown */}
         <div className="relative">
@@ -241,6 +266,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
       </div>
+
+      {/* Staff Security & Role Verification Modal */}
+      {authTargetProfile && (
+        <RoleAuthModal
+          targetProfile={authTargetProfile}
+          onClose={() => setAuthTargetProfile(null)}
+          onSuccess={handleAuthSuccess}
+        />
+      )}
     </header>
   );
 };

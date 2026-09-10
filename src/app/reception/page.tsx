@@ -21,6 +21,9 @@ import {
 import { VoiceTokenCaller } from '@/components/dashboard/VoiceTokenCaller';
 import { DynamicUpiQrModal } from '@/components/billing/DynamicUpiQrModal';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
+
+import { ClinicBroadcast } from '@/lib/broadcast';
 
 export default function ReceptionDeskPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -75,7 +78,7 @@ export default function ReceptionDeskPage() {
       const newPatient = await patientRes.json();
 
       // 2. Assign Immediate Walk-In OPD Token
-      await fetch('/api/appointments', {
+      const apptRes = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,6 +88,24 @@ export default function ReceptionDeskPage() {
           chiefComplaint: walkInComplaint || 'General OPD Consultation',
           timeSlot: 'Now (Queue)',
         }),
+      });
+      const newAppt = await apptRes.json();
+      const tokenNum = newAppt.tokenNumber || (appointments.length + 1);
+
+      // 3. 🚀 REAL-TIME BROADCAST: Notify Accountant & Doctor immediately!
+      ClinicBroadcast.publish({
+        type: 'OPD_TOKEN_ISSUED',
+        title: `Walk-In: ${walkInName} (Token #${tokenNum})`,
+        message: `New patient registered. Collect ₹${CLINIC_CONFIG.consultationFee} OPD fee and record vitals.`,
+        sourceRole: 'RECEPTIONIST',
+        targetRoles: ['ACCOUNTANT', 'DOCTOR', 'NURSE'],
+        data: {
+          patientId: newPatient.id,
+          patientName: walkInName,
+          patientPhone: walkInPhone,
+          tokenNumber: tokenNum,
+          amount: CLINIC_CONFIG.consultationFee,
+        },
       });
 
       // Clear Form & Reload
@@ -101,11 +122,28 @@ export default function ReceptionDeskPage() {
   };
 
   const handleUpdateStatus = async (id: string, status: string) => {
+    const targetAppt = appointments.find((a) => a.id === id);
     await fetch(`/api/appointments/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
+
+    if (status === 'IN_CONSULTATION' && targetAppt) {
+      ClinicBroadcast.publish({
+        type: 'CABIN_CALL',
+        title: `Now in Cabin: Token #${targetAppt.tokenNumber}`,
+        message: `${targetAppt.patient?.name || 'Patient'} called into Doctor's Cabin.`,
+        sourceRole: 'RECEPTIONIST',
+        targetRoles: ['DOCTOR', 'NURSE', 'ALL'],
+        data: {
+          patientId: targetAppt.patientId,
+          patientName: targetAppt.patient?.name,
+          tokenNumber: targetAppt.tokenNumber,
+        },
+      });
+    }
+
     await loadData();
   };
 
@@ -243,7 +281,7 @@ export default function ReceptionDeskPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-800 flex items-center gap-1.5">
                     <CreditCard className="h-4 w-4 text-emerald-600" />
-                    <span>Quick Counter OPD Fee (₹800)</span>
+                    <span>Quick Counter OPD Fee (₹{CLINIC_CONFIG.consultationFee.toLocaleString('en-IN')})</span>
                   </span>
                   <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.2 rounded-full font-bold">
                     UPI / Cash
@@ -253,7 +291,7 @@ export default function ReceptionDeskPage() {
                   onClick={() =>
                     setSelectedUpiModal({
                       invoiceNumber: `FEE-${Date.now().toString().slice(-4)}`,
-                      totalAmount: 800,
+                      totalAmount: CLINIC_CONFIG.consultationFee,
                       patient: { name: 'Walk-In Patient', uhid: 'MF-2026-TEMP' },
                     })
                   }
@@ -366,7 +404,7 @@ export default function ReceptionDeskPage() {
                               /\D/g,
                               ''
                             )}&text=${encodeURIComponent(
-                              `Hello ${item.patient?.name}, your OPD token #${item.tokenNumber} is ready at Dr. Avishek's Clinic. Please wait in the lobby.`
+                              `Hello ${item.patient?.name}, your OPD token #${item.tokenNumber} is ready at ${CLINIC_CONFIG.shortName}. Please wait in the lobby.`
                             )}`}
                             target="_blank"
                             className="p-1.5 rounded-lg border border-slate-200 bg-white text-emerald-700 hover:bg-emerald-50"

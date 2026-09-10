@@ -40,7 +40,7 @@ export const WhatsAppInbox2Way: React.FC<WhatsAppInbox2WayProps> = ({ onSendMess
       unread: 0,
       lastTime: '09:50 AM',
       messages: [
-        { sender: 'CLINIC', text: 'Reminder: Your follow-up appointment with Dr. Avishek is scheduled today at 10:00 AM. Token #2.', time: '08:45 AM' },
+        { sender: 'CLINIC', text: 'Reminder: Your follow-up appointment with Dr. Priyabarta is scheduled today at 10:00 AM. Token #2.', time: '08:45 AM' },
         { sender: 'PATIENT', text: 'I am at the front desk reception.', time: '09:50 AM' },
       ],
     },

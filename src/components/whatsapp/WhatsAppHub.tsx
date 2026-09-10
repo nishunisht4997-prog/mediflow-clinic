@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { WhatsAppService } from '@/services/whatsapp.service';
 import { WhatsAppInbox2Way } from '@/components/whatsapp/WhatsAppInbox2Way';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 interface WhatsAppHubProps {
   logs: any[];
@@ -43,7 +44,7 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
   const [recipientPhone, setRecipientPhone] = useState('+91 98610 11223');
   const [messageType, setMessageType] = useState('APPOINTMENT_CONFIRMED');
   const [messageContent, setMessageContent] = useState(
-    'Hello Rahul, your appointment with Dr. Avishek Mohapatra is confirmed for 09:30 AM today. Token #1. Clinic: Saheed Nagar Main Branch.'
+    `Hello Rahul, your appointment with ${CLINIC_CONFIG.doctorName} is confirmed for 09:30 AM today. Token #1. Clinic: ${CLINIC_CONFIG.branches[0]?.name || 'Saheed Nagar Main Branch'}.`
   );
 
   // Live Gateway Configuration State
@@ -59,11 +60,11 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     setMessageType(type);
     if (type === 'APPOINTMENT_CONFIRMED') {
       setMessageContent(
-        `Hello ${recipientName}, your appointment with Dr. Avishek Mohapatra is confirmed for 09:30 AM today. Token #1. Clinic: Saheed Nagar Main Branch.`
+        `Hello ${recipientName}, your appointment with ${CLINIC_CONFIG.doctorName} is confirmed for 09:30 AM today. Token #1. Clinic: ${CLINIC_CONFIG.branches[0]?.name || 'Saheed Nagar Main Branch'}.`
       );
     } else if (type === 'PRESCRIPTION') {
       setMessageContent(
-        `Dear ${recipientName}, your digital prescription from Dr. Avishek Mohapatra is ready. Download PDF: https://mediflow.in/rx/MF-2026-0001`
+        `Dear ${recipientName}, your digital prescription from ${CLINIC_CONFIG.doctorName} is ready. Download PDF: https://mediflow.in/rx/MF-2026-0001`
       );
     } else if (type === 'INVOICE') {
       setMessageContent(
@@ -71,7 +72,7 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
       );
     } else if (type === 'FOLLOW_UP') {
       setMessageContent(
-        `Hello ${recipientName}, Dr. Avishek recommended a follow-up consultation this week. Tap to book your slot: https://mediflow.in/book/dr-avishek`
+        `Hello ${recipientName}, ${CLINIC_CONFIG.doctorShortName} recommended a follow-up consultation this week. Tap to book your slot: https://mediflow.in/book/clinic`
       );
     }
   };
@@ -324,7 +325,7 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                   </div>
                   <div>
                     <div className="font-bold flex items-center gap-1">
-                      <span>Dr. Avishek Clinic</span>
+                      <span>{CLINIC_CONFIG.shortName}</span>
                       <span className="rounded-full bg-emerald-400 h-2 w-2" />
                     </div>
                     <div className="text-[10px] text-emerald-100">Official Verified Business Account</div>

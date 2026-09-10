@@ -13,6 +13,9 @@ import { DigitalPrescriptionMaker } from '@/components/prescription/DigitalPresc
 import { PrescriptionPdfPreview } from '@/components/prescription/PrescriptionPdfPreview';
 import { BillingInvoicesView } from '@/components/billing/BillingInvoicesView';
 import { BillingModal } from '@/components/billing/BillingModal';
+import { ThermalReceiptModal } from '@/components/billing/ThermalReceiptModal';
+import { DynamicUpiQrModal } from '@/components/billing/DynamicUpiQrModal';
+import { DailyCashDrawerModal } from '@/components/billing/DailyCashDrawerModal';
 import { StaffAttendanceManager } from '@/components/staff/StaffAttendanceManager';
 import { ClinicWorkBoard } from '@/components/tasks/ClinicWorkBoard';
 import { FollowUpCRM } from '@/components/followup/FollowUpCRM';
@@ -20,6 +23,8 @@ import { WhatsAppHub } from '@/components/whatsapp/WhatsAppHub';
 import { ClinicWebsitePreview } from '@/components/public/ClinicWebsitePreview';
 import { PatientPortalView } from '@/components/portal/PatientPortalView';
 import { UserRole } from '@/types';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
+import { ClinicBroadcast } from '@/lib/broadcast';
 
 export default function MediFlowApp() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -44,6 +49,9 @@ export default function MediFlowApp() {
   const [showNewPatientModal, setShowNewPatientModal] = useState(false);
   const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
   const [showNewBillModal, setShowNewBillModal] = useState(false);
+  const [selectedThermalInvoice, setSelectedThermalInvoice] = useState<any | null>(null);
+  const [selectedPaymentInvoice, setSelectedPaymentInvoice] = useState<any | null>(null);
+  const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
   const [viewPdfRx, setViewPdfRx] = useState<any | null>(null);
   const [activeConsultationAppt, setActiveConsultationAppt] = useState<any | null>(null);
 
@@ -159,6 +167,21 @@ export default function MediFlowApp() {
       body: JSON.stringify(payload),
     });
     const created = await res.json();
+
+    // 🚀 REAL-TIME BROADCAST: Notify Accountant & Reception that Rx is ready
+    ClinicBroadcast.publish({
+      type: 'PRESCRIPTION_GENERATED',
+      title: `Rx Generated: ${created.patient?.name || 'Patient'}`,
+      message: `Digital Rx for "${created.diagnosis}" saved. Ready for pharmacy & discharge.`,
+      sourceRole: 'DOCTOR',
+      targetRoles: ['ACCOUNTANT', 'RECEPTIONIST'],
+      data: {
+        patientId: created.patientId,
+        patientName: created.patient?.name,
+        diagnosis: created.diagnosis,
+      },
+    });
+
     await loadAllData();
     return created;
   };
@@ -181,6 +204,62 @@ export default function MediFlowApp() {
     });
     await loadAllData();
     setActiveTab('billing');
+  };
+
+  const handleConfirmPayment = async (invoiceId: string, amount: number) => {
+    const inv = invoices.find((i) => i.id === invoiceId);
+    await fetch('/api/billing/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invoiceId,
+        amount,
+        method: 'UPI',
+        recordedBy: 'Rajesh Behera (POS Cashier)',
+      }),
+    });
+
+    // 🚀 REAL-TIME BROADCAST: Notify Doctor & Reception
+    ClinicBroadcast.publish({
+      type: 'PAYMENT_COLLECTED',
+      title: `Fee Collected: ₹${amount} Paid`,
+      message: `${inv?.patient?.name || 'Patient'} paid fee of ₹${amount}. Patient cleared for doctor cabin.`,
+      sourceRole: 'ACCOUNTANT',
+      targetRoles: ['DOCTOR', 'RECEPTIONIST', 'NURSE'],
+      data: {
+        patientId: inv?.patientId,
+        patientName: inv?.patient?.name,
+        amount,
+        invoiceId,
+      },
+    });
+
+    await loadAllData();
+    setSelectedPaymentInvoice(null);
+  };
+
+  const handleNotificationAction = (type: string, data: any) => {
+    if (type === 'COLLECT_FEE') {
+      setSelectedPaymentInvoice({
+        id: `fee-${Date.now()}`,
+        totalAmount: data.amount || CLINIC_CONFIG.consultationFee,
+        paidAmount: 0,
+        patient: { name: data.patientName || 'Walk-In Patient', uhid: `Token #${data.tokenNumber || 'Queue'}` },
+        invoiceNumber: `FEE-${data.tokenNumber || 'OPD'}`,
+      });
+    } else if (type === 'START_CONSULTATION') {
+      if (data.patientId) {
+        setSelectedPatientId(data.patientId);
+      }
+      setActiveTab('prescriptions');
+    } else if (type === 'VIEW_VITALS') {
+      if (data.patientId) {
+        setSelectedPatientId(data.patientId);
+      }
+      setActiveTab('patients');
+    } else if (type === 'VIEW_RX') {
+      setActiveTab('billing');
+    }
   };
 
   return (
@@ -211,6 +290,7 @@ export default function MediFlowApp() {
             setActiveTab('prescriptions');
           }}
           onOpenQuickSearch={() => setActiveTab('patients')}
+          onNotificationAction={handleNotificationAction}
         />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6">
@@ -288,8 +368,8 @@ export default function MediFlowApp() {
               invoices={invoices}
               stats={billingStats}
               onOpenNewBill={() => setShowNewBillModal(true)}
-              onRecordPayment={(inv) => {}}
-              onPrintInvoice={(inv) => {}}
+              onRecordPayment={(inv) => setSelectedPaymentInvoice(inv)}
+              onPrintInvoice={(inv) => setSelectedThermalInvoice(inv)}
             />
           )}
 
@@ -356,7 +436,7 @@ export default function MediFlowApp() {
                   body: JSON.stringify({
                     recipientName: fu.patient.name,
                     recipientPhone: fu.patient.phone,
-                    content: `Hello ${fu.patient.name}, Dr. Avishek has advised a follow-up review.`,
+                    content: `Hello ${fu.patient.name}, ${CLINIC_CONFIG.doctorShortName} has advised a follow-up review.`,
                     type: 'FOLLOW_UP',
                   }),
                 });
@@ -431,6 +511,32 @@ export default function MediFlowApp() {
         <PrescriptionPdfPreview
           prescription={viewPdfRx}
           onClose={() => setViewPdfRx(null)}
+        />
+      )}
+
+      {/* 80mm POS Thermal Slip Modal */}
+      {selectedThermalInvoice && (
+        <ThermalReceiptModal
+          invoice={selectedThermalInvoice}
+          onClose={() => setSelectedThermalInvoice(null)}
+        />
+      )}
+
+      {/* Dynamic UPI QR Payment Modal */}
+      {selectedPaymentInvoice && (
+        <DynamicUpiQrModal
+          invoice={selectedPaymentInvoice}
+          onClose={() => setSelectedPaymentInvoice(null)}
+          onConfirmPayment={handleConfirmPayment}
+        />
+      )}
+
+      {/* Day-End Cash Drawer Modal */}
+      {showCashDrawerModal && (
+        <DailyCashDrawerModal
+          stats={billingStats}
+          invoices={invoices}
+          onClose={() => setShowCashDrawerModal(false)}
         />
       )}
     </div>

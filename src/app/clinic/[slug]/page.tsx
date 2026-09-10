@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Stethoscope,
   MapPin,
@@ -13,12 +13,24 @@ import {
   Award,
   Sparkles,
   ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import { LiveQueueTicker } from '@/components/public/LiveQueueTicker';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 export default function PublicClinicPage() {
-  const [selectedBranch, setSelectedBranch] = useState('Saheed Nagar Main Polyclinic');
+  const params = useParams();
+  const router = useRouter();
+  const slug = params?.slug as string;
+
+  useEffect(() => {
+    if (slug === 'dr-avishek-clinic') {
+      router.replace('/clinic/dr-priyabarta-clinic');
+    }
+  }, [slug, router]);
+  const [selectedBranch, setSelectedBranch] = useState(CLINIC_CONFIG.branches[0]?.name || 'Saheed Nagar Main Branch');
   const [patientName, setPatientName] = useState('');
   const [phone, setPhone] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -26,6 +38,51 @@ export default function PublicClinicPage() {
   const [complaint, setComplaint] = useState('');
   const [bookedToken, setBookedToken] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Live Database Queue State
+  const [liveQueueStats, setLiveQueueStats] = useState({
+    currentToken: 1,
+    waitingCount: 0,
+    estimatedWaitMins: 0,
+  });
+
+  const fetchLiveQueue = async () => {
+    try {
+      const res = await fetch('/api/appointments');
+      const appts = await res.json();
+      if (Array.isArray(appts)) {
+        const inConsultation = appts.find((a: any) => a.status === 'IN_CONSULTATION');
+        const waiting = appts.filter((a: any) => a.status === 'WAITING');
+        const completed = appts.filter((a: any) => a.status === 'COMPLETED');
+        
+        let tokenNow = 1;
+        if (inConsultation) {
+          tokenNow = inConsultation.tokenNumber;
+        } else if (waiting.length > 0) {
+          tokenNow = waiting[0].tokenNumber;
+        } else if (completed.length > 0) {
+          tokenNow = completed[0].tokenNumber;
+        }
+
+        const waitingCount = waiting.length;
+        const estimatedWaitMins = waitingCount * 12;
+
+        setLiveQueueStats({
+          currentToken: tokenNow,
+          waitingCount,
+          estimatedWaitMins,
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching live queue:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveQueue();
+    const interval = setInterval(fetchLiveQueue, 15000); // 15-second live ticker auto-sync
+    return () => clearInterval(interval);
+  }, []);
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +105,7 @@ export default function PublicClinicPage() {
       });
       const data = await res.json();
       setBookedToken(data.tokenNumber || 7);
+      await fetchLiveQueue();
     } catch (e) {
       console.error(e);
       setBookedToken(7);
@@ -65,7 +123,7 @@ export default function PublicClinicPage() {
             <Stethoscope className="h-5 w-5" />
           </div>
           <div>
-            <span className="font-bold text-sm text-slate-900">Dr. Avishek's Healthcare & Polyclinic</span>
+            <span className="font-bold text-sm text-slate-900">{CLINIC_CONFIG.clinicName}</span>
             <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.2 text-[10px] font-bold text-emerald-800">
               Verified OPD
             </span>
@@ -85,15 +143,19 @@ export default function PublicClinicPage() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-10 space-y-10">
         {/* Live Queue Status Ticker */}
-        <LiveQueueTicker currentToken={3} waitingCount={4} estimatedWaitMins={12} />
+        <LiveQueueTicker
+          currentToken={liveQueueStats.currentToken}
+          waitingCount={liveQueueStats.waitingCount}
+          estimatedWaitMins={liveQueueStats.estimatedWaitMins}
+        />
 
         {/* Doctor Hero Card */}
         <div className="rounded-3xl bg-white border border-slate-200 p-8 shadow-sm flex flex-col md:flex-row items-center gap-8">
           <div className="relative shrink-0">
             <div className="h-40 w-40 rounded-3xl overflow-hidden shadow-xl border-4 border-white">
               <img
-                src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80"
-                alt="Dr. Avishek Mohapatra"
+                src={CLINIC_CONFIG.doctorPhoto}
+                alt={CLINIC_CONFIG.doctorName}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -104,26 +166,26 @@ export default function PublicClinicPage() {
 
           <div className="space-y-3 text-center md:text-left flex-1">
             <div className="flex items-center justify-center md:justify-start gap-2">
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900">Dr. Avishek Mohapatra</h1>
+              <h1 className="text-2xl md:text-3xl font-black text-slate-900">{CLINIC_CONFIG.doctorName}</h1>
             </div>
 
             <div className="text-sm font-bold text-sky-700">
-              MBBS, MD (General Medicine), DNB (Urology)
+              {CLINIC_CONFIG.qualifications}
             </div>
             <p className="text-xs font-mono text-slate-500">
-              Reg. ID: <strong>MCI/OD/2014/09842</strong> &bull; 12+ Years Clinical Experience
+              Reg. ID: <strong>{CLINIC_CONFIG.regNumber}</strong> &bull; {CLINIC_CONFIG.experienceYears}+ Years Clinical Experience
             </p>
 
             <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
-              Senior Consultant Urologist & Specialist Physician. Specialized in adult internal medicine, kidney stone laser management, urinary tract health, hypertension and diabetes.
+              {CLINIC_CONFIG.aboutDoctor}
             </p>
 
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-xs font-semibold text-slate-700 pt-2 border-t border-slate-100">
               <span className="flex items-center gap-1 text-amber-500 font-bold">
-                <Star className="h-4 w-4 fill-current" /> 4.9 Rating (420+ Reviews)
+                <Star className="h-4 w-4 fill-current" /> {CLINIC_CONFIG.rating} Rating ({CLINIC_CONFIG.totalReviews}+ Reviews)
               </span>
               <span className="flex items-center gap-1 font-mono font-bold text-emerald-700">
-                Consultation Fee: ₹800
+                Consultation Fee: ₹{CLINIC_CONFIG.consultationFee}
               </span>
             </div>
           </div>
@@ -138,55 +200,35 @@ export default function PublicClinicPage() {
               <span>Clinic Locations & OPD Hours</span>
             </h2>
 
-            <div
-              onClick={() => setSelectedBranch('Saheed Nagar Main Polyclinic')}
-              className={`rounded-2xl border p-5 space-y-3 cursor-pointer transition ${
-                selectedBranch === 'Saheed Nagar Main Polyclinic'
-                  ? 'border-sky-500 bg-sky-50/50 shadow-xs'
-                  : 'border-slate-200 bg-white'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-sm text-slate-900">Saheed Nagar Main Polyclinic</h3>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                  Open Today
-                </span>
+            {CLINIC_CONFIG.branches.map((branch) => (
+              <div
+                key={branch.name}
+                onClick={() => setSelectedBranch(branch.name)}
+                className={`rounded-2xl border p-5 space-y-3 cursor-pointer transition ${
+                  selectedBranch === branch.name
+                    ? 'border-sky-500 bg-sky-50/50 shadow-xs'
+                    : 'border-slate-200 bg-white'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-slate-900">{branch.name}</h3>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    {branch.statusBadge}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {branch.address}
+                </p>
+                <div className="text-xs font-mono font-semibold text-slate-700 flex items-center gap-1">
+                  <Phone className="h-3.5 w-3.5 text-slate-400" />
+                  <span>{branch.phone}</span>
+                </div>
+                <div className="text-xs text-sky-700 font-medium flex items-center gap-1 pt-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>{branch.timings}</span>
+                </div>
               </div>
-              <p className="text-xs text-slate-500">
-                Plot 104, Janpath Road, Near Saheed Nagar Tower, Bhubaneswar, Odisha
-              </p>
-              <div className="text-xs font-mono font-semibold text-slate-700 flex items-center gap-1">
-                <Phone className="h-3.5 w-3.5 text-slate-400" />
-                <span>+91 98765 43210</span>
-              </div>
-              <div className="text-xs text-sky-700 font-medium flex items-center gap-1 pt-1">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Mon – Sat: 09:00 AM – 01:00 PM &bull; 05:00 PM – 08:30 PM</span>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setSelectedBranch('CDA Sector 9 Branch (Cuttack)')}
-              className={`rounded-2xl border p-5 space-y-3 cursor-pointer transition ${
-                selectedBranch === 'CDA Sector 9 Branch (Cuttack)'
-                  ? 'border-sky-500 bg-sky-50/50 shadow-xs'
-                  : 'border-slate-200 bg-white'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-sm text-slate-900">CDA Sector 9 Branch (Cuttack)</h3>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                  Evening OPD
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                Plot 24, Near High Court Road, CDA Sector 9, Cuttack
-              </p>
-              <div className="text-xs text-sky-700 font-medium flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Tue, Thu, Sun: 03:00 PM – 05:00 PM</span>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Booking Card */}
@@ -204,7 +246,7 @@ export default function PublicClinicPage() {
                 <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto" />
                 <h3 className="text-lg font-bold">Appointment Confirmed!</h3>
                 <p className="text-xs">
-                  Your appointment with Dr. Avishek Mohapatra is booked for <strong>{date} ({timeSlot})</strong>.
+                  Your appointment with {CLINIC_CONFIG.doctorName} is booked for <strong>{date} ({timeSlot})</strong>.
                 </p>
                 <div className="rounded-xl bg-white p-3 border border-emerald-300 font-mono font-black text-xl text-emerald-900">
                   Assigned OPD Token #{bookedToken}

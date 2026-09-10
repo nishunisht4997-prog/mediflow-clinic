@@ -71,16 +71,19 @@ export default function AppointmentsPage() {
             onOpenNewBooking={() => setShowBookingModal(true)}
             onUpdateStatus={handleUpdateStatus}
             onStartConsultation={(appt) => {
-              window.location.href = `/prescriptions?patientId=${appt.patient.id}&appointmentId=${appt.id}`;
+              const pId = appt?.patient?.id || appt?.patientId || '';
+              window.location.href = `/prescriptions?patientId=${pId}&appointmentId=${appt?.id || ''}`;
             }}
             onSendWhatsAppReminder={async (appt) => {
+              const pName = appt.patient?.name || appt.patientName || 'Patient';
+              const pPhone = appt.patient?.phone || appt.phone || '';
               await fetch('/api/whatsapp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  recipientName: appt.patient.name,
-                  recipientPhone: appt.patient.phone,
-                  content: `Dear ${appt.patient.name}, your OPD token #${appt.tokenNumber} is confirmed for ${appt.timeSlot} today.`,
+                  recipientName: pName,
+                  recipientPhone: pPhone,
+                  content: `Dear ${pName}, your OPD token #${appt.tokenNumber} is confirmed for ${appt.timeSlot} today.`,
                   type: 'REMINDER',
                 }),
               });

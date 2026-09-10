@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { FollowUpCRM } from '@/components/followup/FollowUpCRM';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 export default function FollowUpsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -51,13 +52,15 @@ export default function FollowUpsPage() {
               await loadData();
             }}
             onSendWhatsAppFollowUp={async (fu) => {
+              const pName = fu.patient?.name || fu.patientName || 'Patient';
+              const pPhone = fu.patient?.phone || fu.phone || '';
               await fetch('/api/whatsapp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  recipientName: fu.patient.name,
-                  recipientPhone: fu.patient.phone,
-                  content: `Hello ${fu.patient.name}, Dr. Avishek has advised a follow-up consultation.`,
+                  recipientName: pName,
+                  recipientPhone: pPhone,
+                  content: `Hello ${pName}, ${CLINIC_CONFIG.shortName} has scheduled your follow-up consultation on ${fu.dueDate || 'this week'}.`,
                   type: 'FOLLOW_UP',
                 }),
               });

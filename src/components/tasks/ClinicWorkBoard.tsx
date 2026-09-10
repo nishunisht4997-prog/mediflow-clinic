@@ -203,8 +203,8 @@ export const ClinicWorkBoard: React.FC<ClinicWorkBoardProps> = ({
 
       {/* Add Task Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto my-auto">
             <h3 className="text-base font-bold text-slate-900">Delegate New Clinic Task</h3>
 
             <form onSubmit={handleCreate} className="space-y-3 text-xs">

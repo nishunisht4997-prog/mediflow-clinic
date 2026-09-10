@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { CLINIC_CONFIG } from '../src/config/clinic.config';
 
 const prisma = new PrismaClient();
 
@@ -25,20 +26,20 @@ async function main() {
   await prisma.branch.deleteMany();
   await prisma.clinic.deleteMany();
 
-  // 1. Create Main Clinic: Dr. Avishek's Clinic & Care Centre
+  // 1. Create Main Clinic: Genica Healthcare & Polyclinic
   const clinic1 = await prisma.clinic.create({
     data: {
-      name: "Dr. Avishek's Healthcare & Polyclinic",
-      slug: "dr-avishek-clinic",
-      tagline: "Advanced Diagnostics, Urology & General Health Care",
-      phone: "+91 98765 43210",
-      email: "contact@dravishekclinic.in",
-      address: "Plot 104, Saheed Nagar, Janpath Road",
+      name: CLINIC_CONFIG.clinicName,
+      slug: "dr-priyabarta-clinic",
+      tagline: CLINIC_CONFIG.tagline,
+      phone: CLINIC_CONFIG.phone,
+      email: CLINIC_CONFIG.email,
+      address: CLINIC_CONFIG.address,
       city: "Bhubaneswar",
       state: "Odisha",
       currency: "INR",
       currencySymbol: "₹",
-      consultationFee: 800,
+      consultationFee: CLINIC_CONFIG.consultationFee,
       whatsappEnabled: true,
       smsEnabled: true,
       subscriptionTier: "CLINIC_PRO",
@@ -49,9 +50,9 @@ async function main() {
   const branchMain = await prisma.branch.create({
     data: {
       clinicId: clinic1.id,
-      name: "Saheed Nagar Main Branch",
-      address: "Plot 104, Saheed Nagar, Janpath Road, Bhubaneswar",
-      phone: "+91 98765 43210",
+      name: CLINIC_CONFIG.branches[0]?.name || "Saheed Nagar Main Branch",
+      address: CLINIC_CONFIG.branches[0]?.address || "Plot 104, Saheed Nagar, Janpath Road, Bhubaneswar",
+      phone: CLINIC_CONFIG.branches[0]?.phone || "+91 98765 43210",
       isMainBranch: true,
     },
   });
@@ -59,9 +60,9 @@ async function main() {
   const branchCuttack = await prisma.branch.create({
     data: {
       clinicId: clinic1.id,
-      name: "Cuttack CDA Sector 9 Branch",
-      address: "Plot 24, CDA Sector 9, Cuttack",
-      phone: "+91 98765 43211",
+      name: CLINIC_CONFIG.branches[1]?.name || "Cuttack CDA Sector 9 Branch",
+      address: CLINIC_CONFIG.branches[1]?.address || "Plot 24, CDA Sector 9, Cuttack",
+      phone: CLINIC_CONFIG.branches[1]?.phone || "+91 98765 43211",
       isMainBranch: false,
     },
   });
@@ -71,11 +72,11 @@ async function main() {
     data: {
       clinicId: clinic1.id,
       branchId: branchMain.id,
-      name: "Dr. Avishek Mohapatra",
-      email: "doctor@dravishekclinic.in",
-      phone: "+91 98765 43210",
+      name: CLINIC_CONFIG.doctorName,
+      email: CLINIC_CONFIG.email,
+      phone: CLINIC_CONFIG.phone,
       role: "DOCTOR",
-      avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80",
+      avatar: CLINIC_CONFIG.doctorPhoto,
     },
   });
 
@@ -83,12 +84,12 @@ async function main() {
     data: {
       clinicId: clinic1.id,
       userId: docUser.id,
-      specialization: "Senior Physician & Consultant Urologist",
-      qualifications: "MBBS, MD (General Medicine), DNB (Urology)",
-      regNumber: "MCI/OD/2014/09842",
-      experienceYears: 12,
-      consultationFee: 800,
-      bio: "Specializing in adult internal medicine, kidney stone management, prostate health, and diabetic care.",
+      specialization: CLINIC_CONFIG.specialization,
+      qualifications: CLINIC_CONFIG.qualifications,
+      regNumber: CLINIC_CONFIG.regNumber,
+      experienceYears: CLINIC_CONFIG.experienceYears,
+      consultationFee: CLINIC_CONFIG.consultationFee,
+      bio: CLINIC_CONFIG.aboutDoctor,
       availableDays: "Mon,Tue,Wed,Thu,Fri,Sat",
       startTime: "09:00",
       endTime: "19:00",

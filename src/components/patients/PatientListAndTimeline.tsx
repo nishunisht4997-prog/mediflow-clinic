@@ -23,7 +23,9 @@ import {
   FileSpreadsheet,
   ChevronRight,
   Send,
+  UploadCloud,
 } from 'lucide-react';
+import { UploadDocumentModal } from './UploadDocumentModal';
 
 interface PatientListAndTimelineProps {
   patients: any[];
@@ -48,8 +50,8 @@ export const PatientListAndTimeline: React.FC<PatientListAndTimelineProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'timeline' | 'prescriptions' | 'vitals' | 'documents' | 'billing'>('timeline');
-
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [showUploadDocModal, setShowUploadDocModal] = useState(false);
 
   const filteredPatients = patients.filter(
     (p) =>
@@ -424,34 +426,73 @@ export const PatientListAndTimeline: React.FC<PatientListAndTimelineProps> = ({
 
             {/* 4. DOCUMENTS & LAB SCANS */}
             {activeTab === 'documents' && (
-              <div className="space-y-3">
-                {selectedPatient.documents?.map((doc: any) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-800">{doc.title}</h4>
-                        <span className="text-[11px] text-slate-400">
-                          {doc.category} &bull; Uploaded {doc.uploadedAt?.split('T')[0]}
-                        </span>
-                      </div>
-                    </div>
-
-                    <a
-                      href={doc.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    >
-                      View Report
-                    </a>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="text-xs font-bold text-slate-800">
+                    Uploaded Medical Documents & Scans ({selectedPatient.documents?.length || 0})
                   </div>
-                ))}
+                  <button
+                    onClick={() => setShowUploadDocModal(true)}
+                    className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-purple-700 transition"
+                  >
+                    <UploadCloud className="h-3.5 w-3.5" />
+                    <span>+ Upload Lab Document</span>
+                  </button>
+                </div>
+
+                {selectedPatient.documents && selectedPatient.documents.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {selectedPatient.documents.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900">{doc.title}</h4>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              <span className="rounded bg-purple-100/70 text-purple-900 font-semibold px-1.5 py-0.2 mr-1.5 text-[10px]">
+                                {doc.category}
+                              </span>
+                              <span>Uploaded: {doc.uploadedAt?.split('T')[0] || 'Recent'} &bull; {doc.fileSize || '1.2 MB'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-50 transition"
+                        >
+                          View Report
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center space-y-3 bg-slate-50/50">
+                    <div className="h-10 w-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">No Medical Documents Uploaded Yet</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Upload blood tests, pathology reports, X-rays or discharge summaries to this patient's permanent locker.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowUploadDocModal(true)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 shadow-2xs"
+                    >
+                      <UploadCloud className="h-3.5 w-3.5" />
+                      <span>Upload First Document</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -492,6 +533,15 @@ export const PatientListAndTimeline: React.FC<PatientListAndTimelineProps> = ({
         <div className="lg:col-span-8 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 text-sm">
           Select a patient to view full 360° profile and chronological history.
         </div>
+      )}
+
+      {/* Upload Document Modal */}
+      {showUploadDocModal && selectedPatient && (
+        <UploadDocumentModal
+          patient={selectedPatient}
+          onClose={() => setShowUploadDocModal(false)}
+          onUploadSuccess={() => onSelectPatient(selectedPatient.id)}
+        />
       )}
     </div>
   );

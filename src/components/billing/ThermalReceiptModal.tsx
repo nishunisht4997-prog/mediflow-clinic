@@ -3,6 +3,7 @@
 import React from 'react';
 import { Printer, X, Download, Share2 } from 'lucide-react';
 import { formatINR } from '@/lib/utils';
+import { CLINIC_CONFIG } from '@/config/clinic.config';
 
 interface ThermalReceiptModalProps {
   invoice: any;
@@ -16,9 +17,9 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
   if (!invoice) return null;
 
   const clinic = invoice.clinic || {
-    name: "Dr. Avishek's Healthcare",
-    address: 'Plot 104, Saheed Nagar, Janpath Road, Bhubaneswar',
-    phone: '+91 98765 43210',
+    name: CLINIC_CONFIG.clinicName,
+    address: CLINIC_CONFIG.address,
+    phone: CLINIC_CONFIG.phone,
     gstin: '21ABCDE1234F1Z5',
   };
 
